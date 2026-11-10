@@ -1,47 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { Search, Eye, Heart, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { Search, Eye, Heart, SlidersHorizontal, RotateCcw, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 20;
 
 const CATEGORIES = [
   { value: '', label: 'Все категории' },
-  { value: 'antiek-en-kunst', label: 'Антиквариат и искусство' },
-  { value: 'audio-tv-en-foto', label: 'Аудио, ТВ и фото' },
+  { value: 'antiek-en-kunst', label: 'Антиквариат' },
+  { value: 'audio-tv-en-foto', label: 'Аудио, ТВ' },
   { value: 'auto-onderdelen', label: 'Автозапчасти' },
-  { value: 'auto-diversen', label: 'Авто (разное)' },
-  { value: 'boeken', label: 'Книги' },
-  { value: 'caravans-en-kamperen', label: 'Караваны и кемпинг' },
-  { value: 'cd-s-en-dvd-s', label: 'CD и DVD' },
-  { value: 'computers-en-software', label: 'Компьютеры и ПО' },
-  { value: 'contacten-en-berichten', label: 'Контакты и сообщения' },
-  { value: 'dieren-en-toebehoren', label: 'Животные и аксессуары' },
-  { value: 'doe-het-zelf-en-verbouw', label: 'Стройка и ремонт' },
-  { value: 'fietsen-en-brommers', label: 'Велосипеды и мопеды' },
-  { value: 'hobby-en-vrije-tijd', label: 'Хобби и досуг' },
+  { value: 'computers-en-software', label: 'Компьютеры' },
+  { value: 'fietsen-en-brommers', label: 'Велосипеды' },
   { value: 'huis-en-inrichting', label: 'Дом и интерьер' },
-  { value: 'kinderen-en-baby-s', label: 'Дети и малыши' },
   { value: 'kleding-dames', label: 'Женская одежда' },
   { value: 'kleding-heren', label: 'Мужская одежда' },
-  { value: 'muziek-en-instrumenten', label: 'Музыка и инструменты' },
-  { value: 'sieraden-tassen-en-uiterlijk', label: 'Украшения, сумки' },
-  { value: 'spelcomputers-en-games', label: 'Игровые консоли и игры' },
-  { value: 'sport-en-fitness', label: 'Спорт и фитнес' },
+  { value: 'spelcomputers-en-games', label: 'Игровые консоли' },
   { value: 'telecommunicatie', label: 'Телекоммуникации' },
-  { value: 'tickets-en-kaartjes', label: 'Билеты' },
-  { value: 'tuin-en-terras', label: 'Сад и терраса' },
-  { value: 'witgoed-en-apparatuur', label: 'Бытовая техника' },
-  { value: 'zakelijke-goederen', label: 'Деловые товары' },
-  { value: 'diversen', label: 'Разное' },
+];
+
+const PRICE_RANGES = [
+  { value: '', label: 'Любая цена' },
+  { value: '0-100', label: 'До 100 €' },
+  { value: '100-500', label: '100 - 500 €' },
+  { value: '500-1000', label: '500 - 1000 €' },
+  { value: '1000-', label: 'Более 1000 €' },
+];
+
+const VIEWS_RANGES = [
+  { value: '', label: 'Любые просмотры' },
+  { value: '0-50', label: 'До 50' },
+  { value: '50-200', label: '50 - 200' },
+  { value: '200-500', label: '200 - 500' },
+  { value: '500-', label: 'Более 500' },
+];
+
+const LIKES_RANGES = [
+  { value: '', label: 'Любые лайки' },
+  { value: '0-5', label: 'До 5' },
+  { value: '5-20', label: '5 - 20' },
+  { value: '20-', label: 'Более 20' },
+];
+
+const DATE_RANGES = [
+  { value: '', label: 'За всё время' },
+  { value: '1', label: 'За 24 часа' },
+  { value: '3', label: 'За 3 дня' },
+  { value: '7', label: 'За неделю' },
+  { value: '30', label: 'За месяц' },
 ];
 
 const SORT_OPTIONS = [
   { value: 'parsing_date:desc', label: 'Сначала новые' },
   { value: 'views_count:desc', label: 'По просмотрам' },
+  { value: 'favorites_count:desc', label: 'По лайкам' },
   { value: 'price_cents:asc', label: 'Цена: по возрастанию' },
   { value: 'price_cents:desc', label: 'Цена: по убыванию' },
-  { value: 'favorites_count:desc', label: 'По избранному' },
 ];
 
 export default function ListView() {
@@ -50,19 +64,21 @@ export default function ListView() {
   
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [exclude, setExclude] = useState('');
   const [category, setCategory] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
-  const [minViews, setMinViews] = useState('');
+  const [priceRange, setPriceRange] = useState('');
+  const [viewsRange, setViewsRange] = useState('');
+  const [likesRange, setLikesRange] = useState('');
+  const [dateRange, setDateRange] = useState('');
   const [sort, setSort] = useState('parsing_date:desc');
   
-  const [showFilters, setShowFilters] = useState(true); // По умолчанию открыты
+  const [showFilters, setShowFilters] = useState(true);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => { setPage(1); }, [search, category, minPrice, maxPrice, minViews, sort]);
-  useEffect(() => { fetchListings(); }, [search, category, minPrice, maxPrice, minViews, sort, page]);
+  useEffect(() => { setPage(1); }, [search, exclude, category, priceRange, viewsRange, likesRange, dateRange, sort]);
+  useEffect(() => { fetchListings(); }, [search, exclude, category, priceRange, viewsRange, likesRange, dateRange, sort, page]);
 
   const fetchListings = async () => {
     setLoading(true);
@@ -70,12 +86,33 @@ export default function ListView() {
     let query = supabase.from('marktplaats_listings').select('*', { count: 'exact' });
 
     if (search) query = query.ilike('title', `%${search}%`);
+    if (exclude) query = query.not('title', 'ilike', `%${exclude}%`);
     if (category) query = query.eq('category', category);
-    if (minPrice) query = query.gte('price_cents', parseInt(minPrice) * 100);
-    if (maxPrice) query = query.lte('price_cents', parseInt(maxPrice) * 100);
-    if (minViews) query = query.gte('views_count', parseInt(minViews));
 
-    // Исправленная сортировка
+    if (priceRange) {
+      const [min, max] = priceRange.split('-');
+      if (min) query = query.gte('price_cents', parseInt(min) * 100);
+      if (max) query = query.lte('price_cents', parseInt(max) * 100);
+    }
+
+    if (viewsRange) {
+      const [min, max] = viewsRange.split('-');
+      if (min) query = query.gte('views_count', parseInt(min));
+      if (max) query = query.lte('views_count', parseInt(max));
+    }
+
+    if (likesRange) {
+      const [min, max] = likesRange.split('-');
+      if (min) query = query.gte('favorites_count', parseInt(min));
+      if (max) query = query.lte('favorites_count', parseInt(max));
+    }
+
+    if (dateRange) {
+      const d = new Date();
+      d.setDate(d.getDate() - parseInt(dateRange));
+      query = query.gte('publication_date', d.toISOString().split('T')[0]);
+    }
+
     const [sortCol, sortDir] = sort.split(':');
     query = query.order(sortCol, { ascending: sortDir === 'asc' });
 
@@ -93,16 +130,24 @@ export default function ListView() {
   };
 
   const handleSearchSubmit = (e) => { e.preventDefault(); setSearch(searchInput); };
+
+  const resetFilters = () => {
+    setSearchInput(''); setSearch(''); setExclude(''); setCategory('');
+    setPriceRange(''); setViewsRange(''); setLikesRange(''); setDateRange('');
+    setSort('parsing_date:desc');
+  };
+
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+  const selectClass = "w-full bg-[#0a0908] border border-[#333] text-gray-300 text-sm p-2 rounded outline-none focus:border-gray-500 transition-colors cursor-pointer";
 
   return (
-    <div className="min-h-screen bg-[#0a0908] text-gray-300 p-6">
-      <header className="flex justify-between items-center mb-8 border-b border-[#222] pb-4">
-        <h1 className="text-xl font-semibold text-white">echo • Marktplaats Parser</h1>
-        <span className="text-sm text-gray-500">Всего: {totalCount}</span>
+    <div className="min-h-screen bg-[#0a0908] text-gray-300 p-4 md:p-6">
+      <header className="flex justify-between items-center mb-6 border-b border-[#222] pb-4">
+        <h1 className="text-xl font-semibold text-white">Marktplaats Dashboard</h1>
+        <span className="text-sm text-gray-500">Найдено: {totalCount}</span>
       </header>
 
-      <div className="bg-[#141414] p-4 rounded-lg border border-[#222] mb-4 flex flex-wrap gap-4 items-center">
+      <div className="bg-[#141414] p-4 rounded-xl border border-[#222] mb-4 flex flex-wrap gap-3 items-center">
         <form onSubmit={handleSearchSubmit} className="flex-1 flex gap-2 min-w-[250px]">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -111,75 +156,108 @@ export default function ListView() {
               placeholder="Поиск по названию..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full bg-[#0a0908] border border-[#333] rounded p-2 pl-9 text-white outline-none focus:border-gray-500"
+              className="w-full bg-[#0a0908] border border-[#333] rounded-lg p-2.5 pl-9 text-white outline-none focus:border-gray-500"
             />
           </div>
-          <button type="submit" className="px-4 bg-[#222] border border-[#333] rounded text-white hover:bg-[#2a2a2a]">
+          <button type="submit" className="px-5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition">
             Найти
           </button>
         </form>
         
         <button 
           onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2 rounded border ${showFilters ? 'bg-blue-600 border-blue-500 text-white' : 'bg-[#0a0908] border-[#333] text-gray-300 hover:bg-[#1a1a1a]'}`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border ${showFilters ? 'bg-[#2a2a2a] border-[#444] text-white' : 'bg-[#0a0908] border-[#333] text-gray-400 hover:bg-[#1a1a1a]'}`}
         >
           <SlidersHorizontal size={16} /> Фильтры
+        </button>
+        <button onClick={resetFilters} className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#333] bg-[#0a0908] text-gray-400 hover:text-white hover:bg-[#1a1a1a]">
+          <RotateCcw size={16} /> Сброс
         </button>
       </div>
 
       {showFilters && (
-        <div className="bg-[#141414] p-4 rounded-lg border border-[#222] mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Категория</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-[#0a0908] border border-[#333] text-white p-2 rounded outline-none focus:border-gray-500">
-              {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Цена (€)</label>
-            <div className="flex gap-2">
-              <input type="number" placeholder="От" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} className="w-1/2 bg-[#0a0908] border border-[#333] rounded p-2 text-white outline-none focus:border-gray-500" />
-              <input type="number" placeholder="До" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="w-1/2 bg-[#0a0908] border border-[#333] rounded p-2 text-white outline-none focus:border-gray-500" />
+        <div className="bg-[#141414] p-4 rounded-xl border border-[#222] mb-6 animate-in fade-in slide-in-from-top-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Категория</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
+                {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
             </div>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Мин. просмотры</label>
-            <input type="number" placeholder="Например, 50" value={minViews} onChange={(e) => setMinViews(e.target.value)} className="w-full bg-[#0a0908] border border-[#333] rounded p-2 text-white outline-none focus:border-gray-500" />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Сортировка</label>
-            <select value={sort} onChange={(e) => setSort(e.target.value)} className="w-full bg-[#0a0908] border border-[#333] text-white p-2 rounded outline-none focus:border-gray-500">
-              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Цена</label>
+              <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className={selectClass}>
+                {PRICE_RANGES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Просмотры</label>
+              <select value={viewsRange} onChange={(e) => setViewsRange(e.target.value)} className={selectClass}>
+                {VIEWS_RANGES.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Лайки</label>
+              <select value={likesRange} onChange={(e) => setLikesRange(e.target.value)} className={selectClass}>
+                {LIKES_RANGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Дата</label>
+              <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className={selectClass}>
+                {DATE_RANGES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Сортировка</label>
+              <select value={sort} onChange={(e) => setSort(e.target.value)} className={selectClass}>
+                {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Банворды</label>
+              <div className="relative">
+                <XCircle size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="исключить..."
+                  value={exclude}
+                  onChange={(e) => setExclude(e.target.value)}
+                  className="w-full bg-[#0a0908] border border-[#333] rounded p-2 pl-8 text-white text-sm outline-none focus:border-gray-500"
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {error && <div className="bg-red-900/30 border border-red-700 text-red-300 p-3 rounded mb-4">Ошибка: {error}</div>}
+      {error && <div className="bg-red-900/30 border border-red-700 text-red-300 p-3 rounded-lg mb-4">Ошибка: {error}</div>}
 
       {loading ? (
-        <div className="text-center text-gray-500 py-20">Загрузка...</div>
+        <div className="text-center text-gray-500 py-20 animate-pulse">Загрузка данных...</div>
       ) : listings.length === 0 ? (
-        <div className="text-center text-gray-500 py-20">Ничего не найдено по выбранным фильтрам</div>
+        <div className="text-center text-gray-500 py-20 bg-[#141414] rounded-xl border border-[#222]">По вашим фильтрам ничего не найдено</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {listings.map((item) => (
             <Link to={`/listing/${item.id}`} key={item.id}
-              className="bg-[#141414] border border-[#222] rounded-xl overflow-hidden hover:border-gray-500 transition">
-              <div className="h-48 bg-[#222]">
+              className="bg-[#141414] border border-[#222] rounded-xl overflow-hidden hover:border-gray-500 transition-all group flex flex-col">
+              <div className="h-44 bg-[#1a1a1a] relative overflow-hidden">
                 {item.image_url
-                  ? <img src={item.image_url} className="w-full h-full object-cover" alt="" loading="lazy" />
+                  ? <img src={item.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="" loading="lazy" />
                   : <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">Без фото</div>}
               </div>
-              <div className="p-4">
-                <h3 className="text-white text-sm line-clamp-2 min-h-[2.5rem]">{item.title}</h3>
-                <div className="flex gap-3 text-xs text-gray-400 mt-2">
+              <div className="p-3 flex flex-col flex-grow">
+                <h3 className="text-white text-sm line-clamp-2 min-h-[2.5rem] font-medium leading-tight">{item.title}</h3>
+                <div className="flex items-center justify-between text-xs text-gray-500 mt-2 mb-2">
                   <span className="flex items-center gap-1"><Eye size={14} /> {item.views_count || 0}</span>
                   <span className="flex items-center gap-1"><Heart size={14} /> {item.favorites_count || 0}</span>
                 </div>
-                <strong className="text-lg text-white block mt-2">
-                  {item.price_cents ? `€ ${(item.price_cents / 100).toFixed(0)}` : '—'}
-                </strong>
+                <div className="mt-auto">
+                  <strong className="text-lg text-white block">
+                    {item.price_cents ? `€ ${(item.price_cents / 100).toFixed(0)}` : 'См. описание'}
+                  </strong>
+                </div>
               </div>
             </Link>
           ))}
@@ -187,13 +265,13 @@ export default function ListView() {
       )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-4 mt-8">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-2 bg-[#141414] border border-[#333] rounded disabled:opacity-30 hover:bg-[#1a1a1a]">
-            <ChevronLeft size={18} />
+        <div className="flex items-center justify-center gap-4 mt-8 pb-10">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-4 py-2 bg-[#141414] border border-[#333] rounded-lg disabled:opacity-30 hover:bg-[#1a1a1a] text-sm">
+            Назад
           </button>
-          <span className="text-sm">Страница {page} из {totalPages}</span>
-          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-2 bg-[#141414] border border-[#333] rounded disabled:opacity-30 hover:bg-[#1a1a1a]">
-            <ChevronRight size={18} />
+          <span className="text-sm text-gray-400">Страница {page} из {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-4 py-2 bg-[#141414] border border-[#333] rounded-lg disabled:opacity-30 hover:bg-[#1a1a1a] text-sm">
+            Вперед
           </button>
         </div>
       )}
