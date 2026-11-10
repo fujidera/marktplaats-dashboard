@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { Search, Eye, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Eye, Heart, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 20;
@@ -36,26 +36,52 @@ const CATEGORIES = [
   { value: 'diversen', label: 'Разное' },
 ];
 
+const SORT_OPTIONS = [
+  { value: 'parsing_date_desc', label: 'Сначала новые' },
+  { value: 'views_count_desc', label: 'По просмотрам' },
+  { value: 'price_cents_asc', label: 'Цена: по возрастанию' },
+  { value: 'price_cents_desc', label: 'Цена: по убыванию' },
+  { value: 'favorites_count_desc', label: 'По избранному' },
+];
+
 export default function ListView() {
   const [listings, setListings] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [search, setSearch] = useState('');
+  
+  // Состояния фильтров
   const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [minViews, setMinViews] = useState('');
+  const [sort, setSort] = useState('parsing_date_desc');
+  
+  const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => { setPage(1); }, [search, category]);
-  useEffect(() => { fetchListings(); }, [search, category, page]);
+  useEffect(() => { setPage(1); }, [search, category, minPrice, maxPrice, minViews, sort]);
+  useEffect(() => { fetchListings(); }, [search, category, minPrice, maxPrice, minViews, sort, page]);
 
   const fetchListings = async () => {
     setLoading(true);
     setError('');
     let query = supabase.from('marktplaats_listings').select('*', { count: 'exact' });
+
+    // Применяем фильтры
     if (search) query = query.ilike('title', `%${search}%`);
     if (category) query = query.eq('category', category);
-    query = query.order('parsing_date', { ascending: false });
+    if (minPrice) query = query.gte('price_cents', parseInt(minPrice) * 100);
+    if (maxPrice) query = query.lte('price_cents', parseInt(maxPrice) * 100);
+    if (minViews) query = query.gte('views_count', parseInt(minViews));
+
+    // Применяем сортировку
+    const [sortCol, sortDir] = sort.split('_');
+    query = query.order(sortCol, { ascending: sortDir === 'asc' });
+
+    // Пагинация
     const from = (page - 1) * ITEMS_PER_PAGE;
     query = query.range(from, from + ITEMS_PER_PAGE - 1);
 
@@ -79,7 +105,8 @@ export default function ListView() {
         <span className="text-sm text-gray-500">Всего: {totalCount}</span>
       </header>
 
-      <div className="bg-[#141414] p-4 rounded-lg border border-[#222] mb-6 flex flex-wrap gap-4">
+      {/* Панель поиска */}
+      <div className="bg-[#141414] p-4 rounded-lg border border-[#222] mb-4 flex flex-wrap gap-4 items-center">
         <form onSubmit={handleSearchSubmit} className="flex-1 flex gap-2 min-w-[250px]">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -95,21 +122,51 @@ export default function ListView() {
             Найти
           </button>
         </form>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="bg-[#0a0908] border border-[#333] text-white p-2 rounded outline-none focus:border-gray-500 min-w-[200px]"
+        
+        <button 
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-2 px-4 py-2 rounded border ${showFilters ? 'bg-blue-600 border-blue-500 text-white' : 'bg-[#0a0908] border-[#333] text-gray-300 hover:bg-[#1a1a1a]'}`}
         >
-          {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-        </select>
+          <SlidersHorizontal size={16} /> Фильтры
+        </button>
       </div>
+
+      {/* Расширенные фильтры */}
+      {showFilters && (
+        <div className="bg-[#141414] p-4 rounded-lg border border-[#222] mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Категория</label>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-[#0a0908] border border-[#333] text-white p-2 rounded outline-none focus:border-gray-500">
+              {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Цена (€)</label>
+            <div className="flex gap-2">
+              <input type="number" placeholder="От" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} className="w-1/2 bg-[#0a0908] border border-[#333] rounded p-2 text-white outline-none focus:border-gray-500" />
+              <input type="number" placeholder="До" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="w-1/2 bg-[#0a0908] border border-[#333] rounded p-2 text-white outline-none focus:border-gray-500" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Мин. просмотры</label>
+            <input type="number" placeholder="Например, 50" value={minViews} onChange={(e) => setMinViews(e.target.value)} className="w-full bg-[#0a0908] border border-[#333] rounded p-2 text-white outline-none focus:border-gray-500" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Сортировка</label>
+            <select value={sort} onChange={(e) => setSort(e.target.value)} className="w-full bg-[#0a0908] border border-[#333] text-white p-2 rounded outline-none focus:border-gray-500">
+              {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
 
       {error && <div className="bg-red-900/30 border border-red-700 text-red-300 p-3 rounded mb-4">Ошибка: {error}</div>}
 
+      {/* Сетка карточек */}
       {loading ? (
         <div className="text-center text-gray-500 py-20">Загрузка...</div>
       ) : listings.length === 0 ? (
-        <div className="text-center text-gray-500 py-20">Ничего не найдено</div>
+        <div className="text-center text-gray-500 py-20">Ничего не найдено по выбранным фильтрам</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {listings.map((item) => (
@@ -135,21 +192,14 @@ export default function ListView() {
         </div>
       )}
 
+      {/* Пагинация */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-4 mt-8">
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="p-2 bg-[#141414] border border-[#333] rounded disabled:opacity-30 hover:bg-[#1a1a1a]"
-          >
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-2 bg-[#141414] border border-[#333] rounded disabled:opacity-30 hover:bg-[#1a1a1a]">
             <ChevronLeft size={18} />
           </button>
           <span className="text-sm">Страница {page} из {totalPages}</span>
-          <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="p-2 bg-[#141414] border border-[#333] rounded disabled:opacity-30 hover:bg-[#1a1a1a]"
-          >
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-2 bg-[#141414] border border-[#333] rounded disabled:opacity-30 hover:bg-[#1a1a1a]">
             <ChevronRight size={18} />
           </button>
         </div>
