@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from './supabaseClient';
-import { Eye, Heart, ExternalLink, ArrowLeft, Calendar, Tag, User } from 'lucide-react';
+import { Eye, Heart, ExternalLink, ArrowLeft, Calendar, Tag, User, Download, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 export default function ListingDetail() {
   const { id } = useParams();
@@ -10,6 +12,7 @@ export default function ListingDetail() {
   const [snapshots, setSnapshots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -28,6 +31,56 @@ export default function ListingDetail() {
     };
     load();
   }, [id]);
+
+  const handleDownloadZip = async () => {
+    if (!item) return;
+    setIsDownloading(true);
+
+    try {
+      const zip = new JSZip();
+
+      // 1. Формируем текстовый файл info.txt
+      const priceStr = item.price_cents ? `${(item.price_cents / 100).toFixed(0)} €` : 'Не указана';
+      
+      let infoText = `Название\n${item.title}\n\n`;
+      infoText += `Цена\n${priceStr}\n\n`;
+      infoText += `Категория\n${item.category || '—'}\n\n`;
+      infoText += `Описание\n${item.description || 'Описание отсутствует.'}\n\n`;
+      infoText += `Характеристики\n`;
+      infoText += `Продавец: ${item.seller_name || '—'}\n`;
+      infoText += `Просмотры: ${item.views_count || 0}\n`;
+      infoText += `В избранном: ${item.favorites_count || 0}\n`;
+      infoText += `Дата публикации: ${item.publication_date || '—'}\n`;
+      infoText += `Ссылка на оригинал: ${item.url}\n`;
+
+      zip.file("info.txt", infoText);
+
+      // 2. Скачиваем картинку и добавляем в архив
+      if (item.image_url) {
+        try {
+          // Прокси для обхода блокировки CORS
+          const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(item.image_url)}`;
+          const imgResponse = await fetch(proxyUrl);
+          const imgBlob = await imgResponse.blob();
+          zip.file("image.jpg", imgBlob);
+        } catch (err) {
+          console.error("Не удалось скачать картинку:", err);
+          zip.file("image_link.txt", `Не удалось скачать фото. Прямая ссылка:\n${item.image_url}`);
+        }
+      }
+
+      // 3. Генерируем и сохраняем архив
+      const content = await zip.generateAsync({ type: "blob" });
+      const safeTitle = item.title.replace(/[/\\?%*:|"<>]/g, '-').substring(0, 50);
+      saveAs(content, `${safeTitle}.zip`);
+
+    } catch (err) {
+      console.error(err);
+      alert("Ошибка при создании архива: " + err.message);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   if (loading) return <div className="text-white p-6 min-h-screen bg-[#0a0908]">Загрузка...</div>;
   if (error || !item) return (
@@ -61,7 +114,7 @@ export default function ListingDetail() {
             <span className="flex items-center gap-1"><Heart size={16} /> {item.favorites_count || 0} в избранном</span>
           </div>
 
-          <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-4">
+          <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-6">
             <span className="flex items-center gap-1"><Tag size={14} /> {item.category || '—'}</span>
             <span className="flex items-center gap-1">
               <Calendar size={14} /> Опубликовано: {item.publication_date || '—'}
@@ -73,14 +126,23 @@ export default function ListingDetail() {
             )}
           </div>
 
-          <a href={item.url} target="_blank" rel="noreferrer"
-            className="mt-auto block w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-center rounded-lg transition">
-            Открыть на Marktplaats <ExternalLink size={18} className="inline ml-2" />
-          </a>
+          <div className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <a href={item.url} target="_blank" rel="noreferrer"
+              className="flex items-center justify-center gap-2 py-3 bg-[#222] hover:bg-[#333] border border-[#333] text-white text-center rounded-lg transition text-sm font-medium">
+              На Marktplaats <ExternalLink size={16} />
+            </a>
+            <button 
+              onClick={handleDownloadZip} 
+              disabled={isDownloading}
+              className="flex items-center justify-center gap-2 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-center rounded-lg transition text-sm font-medium"
+            >
+              {isDownloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              {isDownloading ? 'Сборка...' : 'Скачать ZIP'}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Блок описания */}
       {item.description && (
         <div className="mt-8 bg-[#141414] border border-[#222] p-6 rounded-xl">
           <h2 className="text-lg text-white mb-4">Описание</h2>
@@ -90,7 +152,6 @@ export default function ListingDetail() {
         </div>
       )}
 
-      {/* История цен */}
       <div className="mt-8 bg-[#141414] border border-[#222] p-6 rounded-xl">
         <h2 className="text-lg text-white mb-4">История цен ({snapshots.length})</h2>
         {snapshots.length === 0 ? (
