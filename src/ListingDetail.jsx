@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from './supabaseClient';
-import { Eye, Heart, ExternalLink, ArrowLeft, Calendar, Tag } from 'lucide-react';
+import { Eye, Heart, ExternalLink, ArrowLeft, Calendar, Tag, User } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function ListingDetail() {
@@ -32,7 +32,7 @@ export default function ListingDetail() {
   if (loading) return <div className="text-white p-6 min-h-screen bg-[#0a0908]">Загрузка...</div>;
   if (error || !item) return (
     <div className="p-6 min-h-screen bg-[#0a0908] text-white">
-      <Link to="/" className="flex items-center gap-2 mb-6"><ArrowLeft size={20}/> Назад</Link>
+      <Link to="/" className="flex items-center gap-2 mb-6 hover:text-gray-400"><ArrowLeft size={20}/> Назад</Link>
       <div className="text-red-400">Объявление не найдено. {error}</div>
     </div>
   );
@@ -50,7 +50,7 @@ export default function ListingDetail() {
             : <span className="text-gray-600">Без изображения</span>}
         </div>
 
-        <div className="w-full md:w-1/2">
+        <div className="w-full md:w-1/2 flex flex-col">
           <h1 className="text-2xl font-bold text-white mb-2">{item.title}</h1>
           <strong className="text-3xl text-white block mb-4">
             {item.price_cents ? `€ ${(item.price_cents / 100).toFixed(2)}` : '—'}
@@ -61,20 +61,36 @@ export default function ListingDetail() {
             <span className="flex items-center gap-1"><Heart size={16} /> {item.favorites_count || 0} в избранном</span>
           </div>
 
-          <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-6">
+          <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-4">
             <span className="flex items-center gap-1"><Tag size={14} /> {item.category || '—'}</span>
             <span className="flex items-center gap-1">
               <Calendar size={14} /> Опубликовано: {item.publication_date || '—'}
             </span>
+            {item.seller_name && (
+              <span className="flex items-center gap-1 text-blue-400 font-medium">
+                <User size={14} /> {item.seller_name}
+              </span>
+            )}
           </div>
 
           <a href={item.url} target="_blank" rel="noreferrer"
-            className="block w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-center rounded-lg transition">
+            className="mt-auto block w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-center rounded-lg transition">
             Открыть на Marktplaats <ExternalLink size={18} className="inline ml-2" />
           </a>
         </div>
       </div>
 
+      {/* Блок описания */}
+      {item.description && (
+        <div className="mt-8 bg-[#141414] border border-[#222] p-6 rounded-xl">
+          <h2 className="text-lg text-white mb-4">Описание</h2>
+          <p className="whitespace-pre-wrap text-sm text-gray-300 leading-relaxed">
+            {item.description}
+          </p>
+        </div>
+      )}
+
+      {/* История цен */}
       <div className="mt-8 bg-[#141414] border border-[#222] p-6 rounded-xl">
         <h2 className="text-lg text-white mb-4">История цен ({snapshots.length})</h2>
         {snapshots.length === 0 ? (
