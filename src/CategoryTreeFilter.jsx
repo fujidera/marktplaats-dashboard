@@ -22,7 +22,6 @@ export default function CategoryTreeFilter({ categories, excluded, onChange }) {
 
   const isExcluded = (path) => excluded.includes(path);
 
-  // ВАЖНО: передаем в onChange именно path (name), а не label
   const toggleCategory = (path) => {
     if (isExcluded(path)) {
       onChange(excluded.filter(p => p !== path));
