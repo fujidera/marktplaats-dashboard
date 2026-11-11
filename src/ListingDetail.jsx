@@ -39,44 +39,38 @@ export default function ListingDetail() {
     try {
       const zip = new JSZip();
 
-      // 1. Формируем текстовый файл info.txt
+      // 1. info.txt
       const priceStr = item.price_cents ? `${(item.price_cents / 100).toFixed(0)} €` : 'Не указана';
-      
-      let infoText = `Название\n${item.title}\n\n`;
-      infoText += `Цена\n${priceStr}\n\n`;
-      infoText += `Категория\n${item.category || '—'}\n\n`;
-      infoText += `Описание\n${item.description || 'Описание отсутствует.'}\n\n`;
-      infoText += `Характеристики\n`;
-      infoText += `Продавец: ${item.seller_name || '—'}\n`;
-      infoText += `Просмотры: ${item.views_count || 0}\n`;
-      infoText += `В избранном: ${item.favorites_count || 0}\n`;
-      infoText += `Дата публикации: ${item.publication_date || '—'}\n`;
-      infoText += `Ссылка на оригинал: ${item.url}\n`;
-
+      let infoText = `Название\n${item.title}\n\nЦена\n${priceStr}\n\nКатегория\n${item.category || '—'}\n\n`;
+      infoText += `Описание\n${item.description || 'Описание отсутствует.'}\n\nХарактеристики\n`;
+      infoText += `Продавец: ${item.seller_name || '—'}\nПросмотры: ${item.views_count || 0}\n`;
+      infoText += `В избранном: ${item.favorites_count || 0}\nДата: ${item.publication_date || '—'}\n`;
+      infoText += `Ссылка: ${item.url}\n`;
       zip.file("info.txt", infoText);
 
-      // 2. Скачиваем картинку и добавляем в архив
-      if (item.image_url) {
+      // 2. Скачиваем ВСЕ фото
+      const urls = item.image_urls && item.image_urls.length > 0 
+        ? item.image_urls 
+        : (item.image_url ? [item.image_url] : []);
+      
+      for (let i = 0; i < urls.length; i++) {
         try {
-          // Прокси для обхода блокировки CORS
-          const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(item.image_url)}`;
+          const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(urls[i])}`;
           const imgResponse = await fetch(proxyUrl);
           const imgBlob = await imgResponse.blob();
-          zip.file("image.jpg", imgBlob);
+          zip.file(`image_${i + 1}.jpg`, imgBlob);
         } catch (err) {
-          console.error("Не удалось скачать картинку:", err);
-          zip.file("image_link.txt", `Не удалось скачать фото. Прямая ссылка:\n${item.image_url}`);
+          console.error(`Не удалось скачать фото ${i + 1}`);
         }
       }
 
-      // 3. Генерируем и сохраняем архив
+      // 3. Генерация и сохранение
       const content = await zip.generateAsync({ type: "blob" });
       const safeTitle = item.title.replace(/[/\\?%*:|"<>]/g, '-').substring(0, 50);
       saveAs(content, `${safeTitle}.zip`);
 
     } catch (err) {
-      console.error(err);
-      alert("Ошибка при создании архива: " + err.message);
+      alert("Ошибка: " + err.message);
     } finally {
       setIsDownloading(false);
     }
@@ -90,6 +84,11 @@ export default function ListingDetail() {
     </div>
   );
 
+  // Формируем список фото для отображения
+  const displayImages = item.image_urls && item.image_urls.length > 0 
+    ? item.image_urls 
+    : (item.image_url ? [item.image_url] : []);
+
   return (
     <div className="min-h-screen bg-[#0a0908] text-gray-300 p-6">
       <Link to="/" className="flex items-center gap-2 text-white mb-6 hover:text-gray-400">
@@ -97,12 +96,23 @@ export default function ListingDetail() {
       </Link>
 
       <div className="flex flex-col md:flex-row gap-8">
-        <div className="w-full md:w-1/2 bg-[#141414] border border-[#222] rounded-xl h-[400px] flex items-center justify-center overflow-hidden">
-          {item.image_url
-            ? <img src={item.image_url} className="w-full h-full object-contain" alt={item.title} />
-            : <span className="text-gray-600">Без изображения</span>}
+        
+        {/* Галерея фото */}
+        <div className="w-full md:w-1/2 bg-[#141414] border border-[#222] rounded-xl overflow-hidden">
+          {displayImages.length > 0 ? (
+            <div className={`grid gap-1 h-full max-h-[500px] ${displayImages.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              {displayImages.map((url, idx) => (
+                <div key={idx} className="bg-black flex items-center justify-center overflow-hidden">
+                  <img src={url} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" alt={`${item.title} - ${idx + 1}`} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="w-full h-[400px] flex items-center justify-center text-gray-600">Без изображения</div>
+          )}
         </div>
 
+        {/* Информация */}
         <div className="w-full md:w-1/2 flex flex-col">
           <h1 className="text-2xl font-bold text-white mb-2">{item.title}</h1>
           <strong className="text-3xl text-white block mb-4">
