@@ -30,7 +30,6 @@ export default function CategoryTreeFilter({ categories, excluded, onChange }) {
     }
   };
 
-  // Считаем все возможные пути
   const allPaths = [];
   categories.forEach(l1 => {
     allPaths.push(l1.name);
