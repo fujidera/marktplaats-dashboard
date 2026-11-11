@@ -8,6 +8,7 @@ import CategoryTreeFilter from './CategoryTreeFilter';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { ru } from 'date-fns/locale';
+import { format } from 'date-fns';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -376,6 +377,7 @@ export default function ListView() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [imageErrors, setImageErrors] = useState({}); // <--- Состояние для битых картинок
 
   useEffect(() => { setPage(1); }, [search, exclude, excludedCategories, minPrice, maxPrice, dateFrom, dateTo, minViews, maxViews, minLikes, maxLikes, sort]);
   useEffect(() => { fetchListings(); }, [search, exclude, excludedCategories, minPrice, maxPrice, dateFrom, dateTo, minViews, maxViews, minLikes, maxLikes, sort, page]);
@@ -407,9 +409,8 @@ export default function ListView() {
     if (minLikes) query = query.gte('favorites_count', parseInt(minLikes));
     if (maxLikes) query = query.lte('favorites_count', parseInt(maxLikes));
     
-    // Форматируем дату в YYYY-MM-DD для Supabase
-    if (dateFrom) query = query.gte('publication_date', dateFrom.toISOString().split('T')[0]);
-    if (dateTo) query = query.lte('publication_date', dateTo.toISOString().split('T')[0]);
+    if (dateFrom) query = query.gte('publication_date', format(dateFrom, 'yyyy-MM-dd'));
+    if (dateTo) query = query.lte('publication_date', format(dateTo, 'yyyy-MM-dd'));
 
     const [sortCol, sortDir] = sort.split(':');
     query = query.order(sortCol, { ascending: sortDir === 'asc' });
@@ -538,8 +539,19 @@ export default function ListView() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {listings.map((item) => (
             <Link to={`/listing/${item.id}`} key={item.id} className="bg-[#141414] border border-[#222] rounded-xl overflow-hidden hover:border-gray-500 transition-all group flex flex-col">
-              <div className="h-44 bg-[#1a1a1a] relative overflow-hidden">
-                {item.image_url ? <img src={item.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt="" loading="lazy" /> : <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">Без фото</div>}
+              <div className="h-44 bg-[#1a1a1a] relative overflow-hidden flex items-center justify-center">
+                {/* Обработка битых картинок */}
+                {item.image_url && !imageErrors[item.id] ? (
+                  <img 
+                    src={item.image_url} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                    alt="" 
+                    loading="lazy" 
+                    onError={() => setImageErrors(prev => ({ ...prev, [item.id]: true }))}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">Без фото</div>
+                )}
               </div>
               <div className="p-3 flex flex-col flex-grow">
                 <h3 className="text-white text-sm line-clamp-2 min-h-[2.5rem] font-medium leading-tight">{item.title}</h3>
