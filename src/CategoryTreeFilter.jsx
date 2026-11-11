@@ -22,6 +22,7 @@ export default function CategoryTreeFilter({ categories, excluded, onChange }) {
 
   const isExcluded = (path) => excluded.includes(path);
 
+  // ВАЖНО: передаем в onChange именно path (name), а не label
   const toggleCategory = (path) => {
     if (isExcluded(path)) {
       onChange(excluded.filter(p => p !== path));
@@ -100,7 +101,9 @@ export default function CategoryTreeFilter({ categories, excluded, onChange }) {
                     onChange={() => toggleCategory(l1.name)}
                     className="w-4 h-4 rounded border-gray-600 bg-[#0a0908] checked:bg-blue-600 cursor-pointer"
                   />
-                  <span className="text-sm text-gray-200 flex-1 cursor-pointer" onClick={() => toggleCategory(l1.name)}>{l1.name}</span>
+                  <span className="text-sm text-gray-200 flex-1 cursor-pointer" onClick={() => toggleCategory(l1.name)}>
+                    {l1.label || l1.name}
+                  </span>
                 </div>
 
                 {isExpanded && l2Items.length > 0 && (
@@ -115,7 +118,9 @@ export default function CategoryTreeFilter({ categories, excluded, onChange }) {
                             onChange={() => toggleCategory(path)}
                             className="w-4 h-4 rounded border-gray-600 bg-[#0a0908] checked:bg-blue-600 cursor-pointer"
                           />
-                          <span className="text-sm text-gray-400 cursor-pointer" onClick={() => toggleCategory(path)}>{l2.name}</span>
+                          <span className="text-sm text-gray-400 cursor-pointer" onClick={() => toggleCategory(path)}>
+                            {l2.label || l2.name}
+                          </span>
                         </div>
                       );
                     })}
