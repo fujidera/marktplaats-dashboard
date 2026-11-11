@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
-import { Search, Eye, Heart, SlidersHorizontal, RotateCcw, XCircle, Calendar as CalendarIcon, Tag, Euro } from 'lucide-react';
+import { Search, Eye, Heart, RotateCcw, XCircle, Calendar as CalendarIcon, Euro } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CategoryTreeFilter from './CategoryTreeFilter';
+
+// Импорты для календаря
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { ru } from 'date-fns/locale';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -364,8 +369,8 @@ export default function ListView() {
   const [minLikes, setMinLikes] = useState('');
   const [maxLikes, setMaxLikes] = useState('');
   
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useState(null);
+  const [dateTo, setDateTo] = useState(null);
   
   const [sort, setSort] = useState('parsing_date:desc');
   const [page, setPage] = useState(1);
@@ -401,8 +406,10 @@ export default function ListView() {
     if (maxViews) query = query.lte('views_count', parseInt(maxViews));
     if (minLikes) query = query.gte('favorites_count', parseInt(minLikes));
     if (maxLikes) query = query.lte('favorites_count', parseInt(maxLikes));
-    if (dateFrom) query = query.gte('publication_date', dateFrom);
-    if (dateTo) query = query.lte('publication_date', dateTo);
+    
+    // Форматируем дату в YYYY-MM-DD для Supabase
+    if (dateFrom) query = query.gte('publication_date', dateFrom.toISOString().split('T')[0]);
+    if (dateTo) query = query.lte('publication_date', dateTo.toISOString().split('T')[0]);
 
     const [sortCol, sortDir] = sort.split(':');
     query = query.order(sortCol, { ascending: sortDir === 'asc' });
@@ -423,7 +430,7 @@ export default function ListView() {
 
   const resetFilters = () => {
     setSearchInput(''); setSearch(''); setExclude(''); setExcludedCategories([]);
-    setMinPrice(''); setMaxPrice(''); setDateFrom(''); setDateTo('');
+    setMinPrice(''); setMaxPrice(''); setDateFrom(null); setDateTo(null);
     setMinViews(''); setMaxViews(''); setMinLikes(''); setMaxLikes('');
     setSort('parsing_date:desc');
   };
@@ -464,10 +471,32 @@ export default function ListView() {
             </div>
           </FilterDropdown>
 
-          <FilterDropdown title="Дата" icon={CalendarIcon} isActive={!!dateFrom || !!dateTo} onClear={() => { setDateFrom(''); setDateTo(''); }}>
+          <FilterDropdown title="Дата" icon={CalendarIcon} isActive={!!dateFrom || !!dateTo} onClear={() => { setDateFrom(null); setDateTo(null); }}>
             <div className="space-y-3">
-              <div><label className="text-xs text-gray-500 mb-1 block">С даты</label><input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputClass} /></div>
-              <div><label className="text-xs text-gray-500 mb-1 block">По дату</label><input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} /></div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">С даты</label>
+                <DatePicker 
+                  selected={dateFrom} 
+                  onChange={(date) => setDateFrom(date)} 
+                  locale={ru}
+                  dateFormat="dd.MM.yyyy"
+                  placeholderText="Выберите дату"
+                  className={inputClass}
+                  isClearable
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">По дату</label>
+                <DatePicker 
+                  selected={dateTo} 
+                  onChange={(date) => setDateTo(date)} 
+                  locale={ru}
+                  dateFormat="dd.MM.yyyy"
+                  placeholderText="Выберите дату"
+                  className={inputClass}
+                  isClearable
+                />
+              </div>
             </div>
           </FilterDropdown>
 
