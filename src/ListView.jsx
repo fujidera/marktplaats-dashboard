@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
-import { Search, Eye, Heart, SlidersHorizontal, RotateCcw, XCircle } from 'lucide-react';
+import { Search, Eye, Heart, SlidersHorizontal, RotateCcw, XCircle, Calendar as CalendarIcon, Tag, Euro } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 20;
@@ -19,21 +19,6 @@ const CATEGORIES = [
   { value: 'telecommunicatie', label: 'Телекоммуникации' },
 ];
 
-const VIEWS_RANGES = [
-  { value: '', label: 'Любые просмотры' },
-  { value: '0-50', label: 'До 50' },
-  { value: '50-200', label: '50 - 200' },
-  { value: '200-500', label: '200 - 500' },
-  { value: '500-', label: 'Более 500' },
-];
-
-const LIKES_RANGES = [
-  { value: '', label: 'Любые лайки' },
-  { value: '0-5', label: 'До 5' },
-  { value: '5-20', label: '5 - 20' },
-  { value: '20-', label: 'Более 20' },
-];
-
 const SORT_OPTIONS = [
   { value: 'parsing_date:desc', label: 'Сначала новые' },
   { value: 'views_count:desc', label: 'По просмотрам' },
@@ -41,6 +26,55 @@ const SORT_OPTIONS = [
   { value: 'price_cents:asc', label: 'Цена: по возрастанию' },
   { value: 'price_cents:desc', label: 'Цена: по убыванию' },
 ];
+
+// Компонент для выезжающих панелей
+function FilterDropdown({ title, icon: Icon, isActive, children, onClear }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Закрытие при клике вне компонента
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-sm w-full transition-colors ${
+          isActive 
+            ? 'bg-blue-600/20 border-blue-500 text-blue-400' 
+            : 'bg-[#0a0908] border-[#333] text-gray-300 hover:bg-[#1a1a1a]'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <Icon size={16} />
+          <span>{title}</span>
+        </div>
+        {isActive && (
+          <div 
+            onClick={(e) => { e.stopPropagation(); onClear(); setIsOpen(false); }}
+            className="p-1 hover:bg-blue-600/50 rounded text-blue-400"
+          >
+            <XCircle size={14} />
+          </div>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-2 w-64 bg-[#141414] border border-[#333] rounded-xl p-4 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ListView() {
   const [listings, setListings] = useState([]);
@@ -52,29 +86,25 @@ export default function ListView() {
   const [exclude, setExclude] = useState('');
   const [category, setCategory] = useState('');
   
-  // Новые состояния для цены и даты
+  // От и До
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
+  const [minViews, setMinViews] = useState('');
+  const [maxViews, setMaxViews] = useState('');
+  const [minLikes, setMinLikes] = useState('');
+  const [maxLikes, setMaxLikes] = useState('');
+  
+  // Даты
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   
-  const [viewsRange, setViewsRange] = useState('');
-  const [likesRange, setLikesRange] = useState('');
   const [sort, setSort] = useState('parsing_date:desc');
-  
-  const [showFilters, setShowFilters] = useState(true);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Следим за изменениями фильтров, чтобы сбрасывать страницу на 1-ю
-  useEffect(() => { 
-    setPage(1); 
-  }, [search, exclude, category, minPrice, maxPrice, dateFrom, dateTo, viewsRange, likesRange, sort]);
-
-  useEffect(() => { 
-    fetchListings(); 
-  }, [search, exclude, category, minPrice, maxPrice, dateFrom, dateTo, viewsRange, likesRange, sort, page]);
+  useEffect(() => { setPage(1); }, [search, exclude, category, minPrice, maxPrice, dateFrom, dateTo, minViews, maxViews, minLikes, maxLikes, sort]);
+  useEffect(() => { fetchListings(); }, [search, exclude, category, minPrice, maxPrice, dateFrom, dateTo, minViews, maxViews, minLikes, maxLikes, sort, page]);
 
   const fetchListings = async () => {
     setLoading(true);
@@ -85,25 +115,19 @@ export default function ListView() {
     if (exclude) query = query.not('title', 'ilike', `%${exclude}%`);
     if (category) query = query.eq('category', category);
 
-    // Логика фильтрации по цене (От и До)
+    // Цена
     if (minPrice) query = query.gte('price_cents', parseInt(minPrice) * 100);
     if (maxPrice) query = query.lte('price_cents', parseInt(maxPrice) * 100);
 
-    // Логика фильтрации по просмотрам
-    if (viewsRange) {
-      const [min, max] = viewsRange.split('-');
-      if (min) query = query.gte('views_count', parseInt(min));
-      if (max) query = query.lte('views_count', parseInt(max));
-    }
+    // Просмотры
+    if (minViews) query = query.gte('views_count', parseInt(minViews));
+    if (maxViews) query = query.lte('views_count', parseInt(maxViews));
 
-    // Логика фильтрации по лайкам
-    if (likesRange) {
-      const [min, max] = likesRange.split('-');
-      if (min) query = query.gte('favorites_count', parseInt(min));
-      if (max) query = query.lte('favorites_count', parseInt(max));
-    }
+    // Лайки
+    if (minLikes) query = query.gte('favorites_count', parseInt(minLikes));
+    if (maxLikes) query = query.lte('favorites_count', parseInt(maxLikes));
 
-    // Логика фильтрации по дате (От и До)
+    // Дата
     if (dateFrom) query = query.gte('publication_date', dateFrom);
     if (dateTo) query = query.lte('publication_date', dateTo);
 
@@ -128,13 +152,13 @@ export default function ListView() {
   const resetFilters = () => {
     setSearchInput(''); setSearch(''); setExclude(''); setCategory('');
     setMinPrice(''); setMaxPrice(''); setDateFrom(''); setDateTo('');
-    setViewsRange(''); setLikesRange('');
+    setMinViews(''); setMaxViews(''); setMinLikes(''); setMaxLikes('');
     setSort('parsing_date:desc');
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
-  const selectClass = "w-full bg-[#0a0908] border border-[#333] text-gray-300 text-sm p-2 rounded outline-none focus:border-gray-500 transition-colors cursor-pointer";
-  const inputClass = "w-full bg-[#0a0908] border border-[#333] text-white text-sm p-2 rounded outline-none focus:border-gray-500";
+  const inputClass = "w-full bg-[#0a0908] border border-[#333] text-white text-sm p-2 rounded outline-none focus:border-blue-500 transition-colors";
+  const selectClass = "w-full bg-[#0a0908] border border-[#333] text-gray-300 text-sm p-2 rounded outline-none focus:border-blue-500 transition-colors cursor-pointer";
 
   return (
     <div className="min-h-screen bg-[#0a0908] text-gray-300 p-4 md:p-6">
@@ -143,6 +167,7 @@ export default function ListView() {
         <span className="text-sm text-gray-500">Найдено: {totalCount}</span>
       </header>
 
+      {/* Верхняя панель поиска */}
       <div className="bg-[#141414] p-4 rounded-xl border border-[#222] mb-4 flex flex-wrap gap-3 items-center">
         <form onSubmit={handleSearchSubmit} className="flex-1 flex gap-2 min-w-[250px]">
           <div className="flex-1 relative">
@@ -152,7 +177,7 @@ export default function ListView() {
               placeholder="Поиск по названию..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full bg-[#0a0908] border border-[#333] rounded-lg p-2.5 pl-9 text-white outline-none focus:border-gray-500"
+              className="w-full bg-[#0a0908] border border-[#333] rounded-lg p-2.5 pl-9 text-white outline-none focus:border-blue-500"
             />
           </div>
           <button type="submit" className="px-5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition">
@@ -160,118 +185,103 @@ export default function ListView() {
           </button>
         </form>
         
-        <button 
-          onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border ${showFilters ? 'bg-[#2a2a2a] border-[#444] text-white' : 'bg-[#0a0908] border-[#333] text-gray-400 hover:bg-[#1a1a1a]'}`}
-        >
-          <SlidersHorizontal size={16} /> Фильтры
-        </button>
-        <button onClick={resetFilters} className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#333] bg-[#0a0908] text-gray-400 hover:text-white hover:bg-[#1a1a1a]">
+        <button onClick={resetFilters} className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#333] bg-[#0a0908] text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition">
           <RotateCcw size={16} /> Сброс
         </button>
       </div>
 
-      {showFilters && (
-        <div className="bg-[#141414] p-4 rounded-xl border border-[#222] mb-6 animate-in fade-in slide-in-from-top-2">
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-3">
-            
-            {/* Категория */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Категория</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
-                {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
-            </div>
+      {/* Панель фильтров (с выезжающими меню) */}
+      <div className="bg-[#141414] p-4 rounded-xl border border-[#222] mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+          
+          {/* Категория */}
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
+            {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
 
-            {/* Цена (От и До) */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Цена (€)</label>
-              <div className="flex gap-2">
-                <input 
-                  type="number" 
-                  placeholder="От" 
-                  value={minPrice} 
-                  onChange={(e) => setMinPrice(e.target.value)} 
-                  className={inputClass} 
-                />
-                <input 
-                  type="number" 
-                  placeholder="До" 
-                  value={maxPrice} 
-                  onChange={(e) => setMaxPrice(e.target.value)} 
-                  className={inputClass} 
-                />
+          {/* Цена (От и До) */}
+          <FilterDropdown 
+            title="Цена (€)" 
+            icon={Euro} 
+            isActive={!!minPrice || !!maxPrice}
+            onClear={() => { setMinPrice(''); setMaxPrice(''); }}
+          >
+            <div className="flex gap-2">
+              <input type="number" placeholder="От" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} className={inputClass} />
+              <input type="number" placeholder="До" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className={inputClass} />
+            </div>
+          </FilterDropdown>
+
+          {/* Дата */}
+          <FilterDropdown 
+            title="Дата" 
+            icon={CalendarIcon} 
+            isActive={!!dateFrom || !!dateTo}
+            onClear={() => { setDateFrom(''); setDateTo(''); }}
+          >
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">С даты</label>
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">По дату</label>
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} />
               </div>
             </div>
+          </FilterDropdown>
 
-            {/* Дата (С и По - с календарем) */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Дата публикации</label>
-              <div className="flex gap-2">
-                <input 
-                  type="date" 
-                  value={dateFrom} 
-                  onChange={(e) => setDateFrom(e.target.value)} 
-                  className={inputClass} 
-                  title="С даты"
-                />
-                <input 
-                  type="date" 
-                  value={dateTo} 
-                  onChange={(e) => setDateTo(e.target.value)} 
-                  className={inputClass} 
-                  title="По дату"
-                />
-              </div>
+          {/* Просмотры (От и До) */}
+          <FilterDropdown 
+            title="Просмотры" 
+            icon={Eye} 
+            isActive={!!minViews || !!maxViews}
+            onClear={() => { setMinViews(''); setMaxViews(''); }}
+          >
+            <div className="flex gap-2">
+              <input type="number" placeholder="От" value={minViews} onChange={(e) => setMinViews(e.target.value)} className={inputClass} />
+              <input type="number" placeholder="До" value={maxViews} onChange={(e) => setMaxViews(e.target.value)} className={inputClass} />
             </div>
+          </FilterDropdown>
 
-            {/* Просмотры */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Просмотры</label>
-              <select value={viewsRange} onChange={(e) => setViewsRange(e.target.value)} className={selectClass}>
-                {VIEWS_RANGES.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
-              </select>
+          {/* Лайки (От и До) */}
+          <FilterDropdown 
+            title="Лайки" 
+            icon={Heart} 
+            isActive={!!minLikes || !!maxLikes}
+            onClear={() => { setMinLikes(''); setMaxLikes(''); }}
+          >
+            <div className="flex gap-2">
+              <input type="number" placeholder="От" value={minLikes} onChange={(e) => setMinLikes(e.target.value)} className={inputClass} />
+              <input type="number" placeholder="До" value={maxLikes} onChange={(e) => setMaxLikes(e.target.value)} className={inputClass} />
             </div>
+          </FilterDropdown>
 
-            {/* Лайки */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Лайки</label>
-              <select value={likesRange} onChange={(e) => setLikesRange(e.target.value)} className={selectClass}>
-                {LIKES_RANGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
-              </select>
-            </div>
-          </div>
+          {/* Сортировка */}
+          <select value={sort} onChange={(e) => setSort(e.target.value)} className={selectClass}>
+            {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
 
-          {/* Второй ряд фильтров */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Сортировка */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Сортировка</label>
-              <select value={sort} onChange={(e) => setSort(e.target.value)} className={selectClass}>
-                {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
+        </div>
 
-            {/* Банворды */}
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Исключить слова (Банворды)</label>
-              <div className="relative">
-                <XCircle size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input
-                  type="text"
-                  placeholder="Например: битые, ремонт, копия..."
-                  value={exclude}
-                  onChange={(e) => setExclude(e.target.value)}
-                  className="w-full bg-[#0a0908] border border-[#333] rounded p-2 pl-8 text-white text-sm outline-none focus:border-gray-500"
-                />
-              </div>
-            </div>
+        {/* Банворды */}
+        <div className="mt-3">
+          <div className="relative">
+            <XCircle size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Исключить слова из названия (банворды)..."
+              value={exclude}
+              onChange={(e) => setExclude(e.target.value)}
+              className="w-full bg-[#0a0908] border border-[#333] rounded-lg p-2.5 pl-9 text-white text-sm outline-none focus:border-red-500 transition-colors"
+            />
           </div>
         </div>
-      )}
+      </div>
 
       {error && <div className="bg-red-900/30 border border-red-700 text-red-300 p-3 rounded-lg mb-4">Ошибка: {error}</div>}
 
+      {/* Сетка карточек */}
       {loading ? (
         <div className="text-center text-gray-500 py-20 animate-pulse">Загрузка данных...</div>
       ) : listings.length === 0 ? (
