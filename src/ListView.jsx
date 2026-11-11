@@ -19,14 +19,6 @@ const CATEGORIES = [
   { value: 'telecommunicatie', label: 'Телекоммуникации' },
 ];
 
-const PRICE_RANGES = [
-  { value: '', label: 'Любая цена' },
-  { value: '0-100', label: 'До 100 €' },
-  { value: '100-500', label: '100 - 500 €' },
-  { value: '500-1000', label: '500 - 1000 €' },
-  { value: '1000-', label: 'Более 1000 €' },
-];
-
 const VIEWS_RANGES = [
   { value: '', label: 'Любые просмотры' },
   { value: '0-50', label: 'До 50' },
@@ -42,14 +34,6 @@ const LIKES_RANGES = [
   { value: '20-', label: 'Более 20' },
 ];
 
-const DATE_RANGES = [
-  { value: '', label: 'За всё время' },
-  { value: '1', label: 'За 24 часа' },
-  { value: '3', label: 'За 3 дня' },
-  { value: '7', label: 'За неделю' },
-  { value: '30', label: 'За месяц' },
-];
-
 const SORT_OPTIONS = [
   { value: 'parsing_date:desc', label: 'Сначала новые' },
   { value: 'views_count:desc', label: 'По просмотрам' },
@@ -62,14 +46,20 @@ export default function ListView() {
   const [listings, setListings] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   
+  // Состояния фильтров
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [exclude, setExclude] = useState('');
   const [category, setCategory] = useState('');
-  const [priceRange, setPriceRange] = useState('');
+  
+  // Новые состояния для цены и даты
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  
   const [viewsRange, setViewsRange] = useState('');
   const [likesRange, setLikesRange] = useState('');
-  const [dateRange, setDateRange] = useState('');
   const [sort, setSort] = useState('parsing_date:desc');
   
   const [showFilters, setShowFilters] = useState(true);
@@ -77,8 +67,14 @@ export default function ListView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => { setPage(1); }, [search, exclude, category, priceRange, viewsRange, likesRange, dateRange, sort]);
-  useEffect(() => { fetchListings(); }, [search, exclude, category, priceRange, viewsRange, likesRange, dateRange, sort, page]);
+  // Следим за изменениями фильтров, чтобы сбрасывать страницу на 1-ю
+  useEffect(() => { 
+    setPage(1); 
+  }, [search, exclude, category, minPrice, maxPrice, dateFrom, dateTo, viewsRange, likesRange, sort]);
+
+  useEffect(() => { 
+    fetchListings(); 
+  }, [search, exclude, category, minPrice, maxPrice, dateFrom, dateTo, viewsRange, likesRange, sort, page]);
 
   const fetchListings = async () => {
     setLoading(true);
@@ -89,29 +85,27 @@ export default function ListView() {
     if (exclude) query = query.not('title', 'ilike', `%${exclude}%`);
     if (category) query = query.eq('category', category);
 
-    if (priceRange) {
-      const [min, max] = priceRange.split('-');
-      if (min) query = query.gte('price_cents', parseInt(min) * 100);
-      if (max) query = query.lte('price_cents', parseInt(max) * 100);
-    }
+    // Логика фильтрации по цене (От и До)
+    if (minPrice) query = query.gte('price_cents', parseInt(minPrice) * 100);
+    if (maxPrice) query = query.lte('price_cents', parseInt(maxPrice) * 100);
 
+    // Логика фильтрации по просмотрам
     if (viewsRange) {
       const [min, max] = viewsRange.split('-');
       if (min) query = query.gte('views_count', parseInt(min));
       if (max) query = query.lte('views_count', parseInt(max));
     }
 
+    // Логика фильтрации по лайкам
     if (likesRange) {
       const [min, max] = likesRange.split('-');
       if (min) query = query.gte('favorites_count', parseInt(min));
       if (max) query = query.lte('favorites_count', parseInt(max));
     }
 
-    if (dateRange) {
-      const d = new Date();
-      d.setDate(d.getDate() - parseInt(dateRange));
-      query = query.gte('publication_date', d.toISOString().split('T')[0]);
-    }
+    // Логика фильтрации по дате (От и До)
+    if (dateFrom) query = query.gte('publication_date', dateFrom);
+    if (dateTo) query = query.lte('publication_date', dateTo);
 
     const [sortCol, sortDir] = sort.split(':');
     query = query.order(sortCol, { ascending: sortDir === 'asc' });
@@ -133,12 +127,14 @@ export default function ListView() {
 
   const resetFilters = () => {
     setSearchInput(''); setSearch(''); setExclude(''); setCategory('');
-    setPriceRange(''); setViewsRange(''); setLikesRange(''); setDateRange('');
+    setMinPrice(''); setMaxPrice(''); setDateFrom(''); setDateTo('');
+    setViewsRange(''); setLikesRange('');
     setSort('parsing_date:desc');
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const selectClass = "w-full bg-[#0a0908] border border-[#333] text-gray-300 text-sm p-2 rounded outline-none focus:border-gray-500 transition-colors cursor-pointer";
+  const inputClass = "w-full bg-[#0a0908] border border-[#333] text-white text-sm p-2 rounded outline-none focus:border-gray-500";
 
   return (
     <div className="min-h-screen bg-[#0a0908] text-gray-300 p-4 md:p-6">
@@ -177,50 +173,93 @@ export default function ListView() {
 
       {showFilters && (
         <div className="bg-[#141414] p-4 rounded-xl border border-[#222] mb-6 animate-in fade-in slide-in-from-top-2">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-3">
+            
+            {/* Категория */}
             <div>
               <label className="block text-xs text-gray-500 mb-1.5 ml-1">Категория</label>
               <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
                 {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
+
+            {/* Цена (От и До) */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Цена</label>
-              <select value={priceRange} onChange={(e) => setPriceRange(e.target.value)} className={selectClass}>
-                {PRICE_RANGES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
+              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Цена (€)</label>
+              <div className="flex gap-2">
+                <input 
+                  type="number" 
+                  placeholder="От" 
+                  value={minPrice} 
+                  onChange={(e) => setMinPrice(e.target.value)} 
+                  className={inputClass} 
+                />
+                <input 
+                  type="number" 
+                  placeholder="До" 
+                  value={maxPrice} 
+                  onChange={(e) => setMaxPrice(e.target.value)} 
+                  className={inputClass} 
+                />
+              </div>
             </div>
+
+            {/* Дата (С и По - с календарем) */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Дата публикации</label>
+              <div className="flex gap-2">
+                <input 
+                  type="date" 
+                  value={dateFrom} 
+                  onChange={(e) => setDateFrom(e.target.value)} 
+                  className={inputClass} 
+                  title="С даты"
+                />
+                <input 
+                  type="date" 
+                  value={dateTo} 
+                  onChange={(e) => setDateTo(e.target.value)} 
+                  className={inputClass} 
+                  title="По дату"
+                />
+              </div>
+            </div>
+
+            {/* Просмотры */}
             <div>
               <label className="block text-xs text-gray-500 mb-1.5 ml-1">Просмотры</label>
               <select value={viewsRange} onChange={(e) => setViewsRange(e.target.value)} className={selectClass}>
                 {VIEWS_RANGES.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
               </select>
             </div>
+
+            {/* Лайки */}
             <div>
               <label className="block text-xs text-gray-500 mb-1.5 ml-1">Лайки</label>
               <select value={likesRange} onChange={(e) => setLikesRange(e.target.value)} className={selectClass}>
                 {LIKES_RANGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
               </select>
             </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Дата</label>
-              <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className={selectClass}>
-                {DATE_RANGES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-              </select>
-            </div>
+          </div>
+
+          {/* Второй ряд фильтров */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Сортировка */}
             <div>
               <label className="block text-xs text-gray-500 mb-1.5 ml-1">Сортировка</label>
               <select value={sort} onChange={(e) => setSort(e.target.value)} className={selectClass}>
                 {SORT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
+
+            {/* Банворды */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Банворды</label>
+              <label className="block text-xs text-gray-500 mb-1.5 ml-1">Исключить слова (Банворды)</label>
               <div className="relative">
                 <XCircle size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="исключить..."
+                  placeholder="Например: битые, ремонт, копия..."
                   value={exclude}
                   onChange={(e) => setExclude(e.target.value)}
                   className="w-full bg-[#0a0908] border border-[#333] rounded p-2 pl-8 text-white text-sm outline-none focus:border-gray-500"
