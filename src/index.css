@@ -14,7 +14,71 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-/* Фикс для нативного календаря и других системных элементов */
+
+/* Фикс для нативных элементов (иконки) */
 input, select, textarea, button {
   color-scheme: dark;
+}
+
+/* --- Стили для календаря react-datepicker --- */
+.react-datepicker {
+  background-color: #141414 !important;
+  border: 1px solid #333 !important;
+  font-family: inherit !important;
+  color: #d1d5db !important;
+}
+
+.react-datepicker__header {
+  background-color: #0a0908 !important;
+  border-bottom: 1px solid #333 !important;
+}
+
+.react-datepicker__current-month, 
+.react-datepicker-time__header, 
+.react-datepicker-year-header,
+.react-datepicker__day-name {
+  color: #d1d5db !important;
+}
+
+.react-datepicker__day {
+  color: #d1d5db !important;
+}
+
+.react-datepicker__day:hover {
+  background-color: #333 !important;
+  color: white !important;
+  border-radius: 0.3rem !important;
+}
+
+.react-datepicker__day--selected, 
+.react-datepicker__day--in-selecting-range, 
+.react-datepicker__day--in-range {
+  background-color: #2563eb !important;
+  color: white !important;
+}
+
+.react-datepicker__day--keyboard-selected {
+  background-color: #1d4ed8 !important;
+}
+
+.react-datepicker__day--outside-month {
+  color: #555 !important;
+}
+
+.react-datepicker__triangle {
+  display: none !important;
+}
+
+.react-datepicker-popper {
+  z-index: 100 !important;
+}
+
+.react-datepicker__close-icon::after {
+  background-color: transparent !important;
+  color: #888 !important;
+  font-size: 16px !important;
+}
+
+.react-datepicker__close-icon:hover::after {
+  color: #fff !important;
 }
