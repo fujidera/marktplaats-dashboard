@@ -13,6 +13,7 @@ export default function ListingDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [failedImages, setFailedImages] = useState({}); // Состояние для битых картинок
 
   useEffect(() => {
     const load = async () => {
@@ -54,9 +55,14 @@ export default function ListingDetail() {
         : (item.image_url ? [item.image_url] : []);
       
       for (let i = 0; i < urls.length; i++) {
+        // Пропускаем картинки, которые не загрузились на сайте
+        if (failedImages[i]) continue; 
+
         try {
           const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(urls[i])}`;
           const imgResponse = await fetch(proxyUrl);
+          if (!imgResponse.ok) throw new Error("Ошибка сети");
+          
           const imgBlob = await imgResponse.blob();
           zip.file(`image_${i + 1}.jpg`, imgBlob);
         } catch (err) {
@@ -70,10 +76,15 @@ export default function ListingDetail() {
       saveAs(content, `${safeTitle}.zip`);
 
     } catch (err) {
-      alert("Ошибка: " + err.message);
+      alert("Ошибка при создании архива: " + err.message);
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  // Обработчик ошибки загрузки картинки
+  const handleImageError = (index) => {
+    setFailedImages(prev => ({ ...prev, [index]: true }));
   };
 
   if (loading) return <div className="text-white p-6 min-h-screen bg-[#0a0908]">Загрузка...</div>;
@@ -96,18 +107,30 @@ export default function ListingDetail() {
 
       <div className="flex flex-col md:flex-row gap-8">
         
-        {/* Галерея фото */}
-        <div className="w-full md:w-1/2 bg-[#141414] border border-[#222] rounded-xl overflow-hidden">
+        {/* Галерея фото с обработкой битых ссылок */}
+        <div className="w-full md:w-1/2 bg-[#141414] border border-[#222] rounded-xl overflow-hidden min-h-[400px]">
           {displayImages.length > 0 ? (
             <div className={`grid gap-1 h-full max-h-[500px] ${displayImages.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
               {displayImages.map((url, idx) => (
-                <div key={idx} className="bg-black flex items-center justify-center overflow-hidden">
-                  <img src={url} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" alt={`${item.title} - ${idx + 1}`} />
+                <div key={idx} className="bg-[#1a1a1a] flex items-center justify-center overflow-hidden relative">
+                  {!failedImages[idx] ? (
+                    <img 
+                      src={url} 
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" 
+                      alt={`${item.title} - ${idx + 1}`} 
+                      onError={() => handleImageError(idx)} // <--- Ловим битые ссылки
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-gray-500">
+                      <span className="text-3xl mb-2">🖼️</span>
+                      <span className="text-sm">Фото удалено</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           ) : (
-            <div className="w-full h-[400px] flex items-center justify-center text-gray-600">Без изображения</div>
+            <div className="w-full h-full flex items-center justify-center text-gray-600">Без изображения</div>
           )}
         </div>
 
@@ -124,7 +147,6 @@ export default function ListingDetail() {
           </div>
 
           <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-6">
-            {/* ИЗМЕНЕНО ЗДЕСЬ */}
             <span className="flex items-center gap-1"><Tag size={14} /> {item.category_l1 || '—'}</span>
             <span className="flex items-center gap-1">
               <Calendar size={14} /> Опубликовано: {item.publication_date || '—'}
