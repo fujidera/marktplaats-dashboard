@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
-import { Search, Eye, Heart, RotateCcw, XCircle, Calendar as CalendarIcon, Euro } from 'lucide-react';
+import { Search, Eye, Heart, RotateCcw, XCircle, Calendar as CalendarIcon, Euro, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CategoryTreeFilter from './CategoryTreeFilter';
 
@@ -9,6 +9,11 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { ru } from 'date-fns/locale';
 import { format } from 'date-fns';
+
+// Новые импорты для пресетов и избранного
+import { PresetControls } from './components/PresetControls';
+import { FavoriteButton } from './components/FavoriteButton';
+import { useFavoriteIds } from './hooks/useFavorites';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -377,7 +382,10 @@ export default function ListView() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [imageErrors, setImageErrors] = useState({}); // <--- Состояние для битых картинок
+  const [imageErrors, setImageErrors] = useState({});
+
+  // Хук для избранного
+  const { favoriteIds, toggleFavorite } = useFavoriteIds();
 
   useEffect(() => { setPage(1); }, [search, exclude, excludedCategories, minPrice, maxPrice, dateFrom, dateTo, minViews, maxViews, minLikes, maxLikes, sort]);
   useEffect(() => { fetchListings(); }, [search, exclude, excludedCategories, minPrice, maxPrice, dateFrom, dateTo, minViews, maxViews, minLikes, maxLikes, sort, page]);
@@ -436,6 +444,38 @@ export default function ListView() {
     setSort('parsing_date:desc');
   };
 
+  // Функции для работы с пресетами
+  const collectFilters = () => ({
+    search,
+    exclude,
+    excludedCategories,
+    minPrice,
+    maxPrice,
+    minViews,
+    maxViews,
+    minLikes,
+    maxLikes,
+    dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : null,
+    dateTo:   dateTo   ? format(dateTo,   'yyyy-MM-dd') : null,
+    sort,
+  });
+
+  const applyPreset = (f) => {
+    setSearch(f.search ?? '');
+    setSearchInput(f.search ?? '');
+    setExclude(f.exclude ?? '');
+    setExcludedCategories(Array.isArray(f.excludedCategories) ? f.excludedCategories : []);
+    setMinPrice(f.minPrice ?? '');
+    setMaxPrice(f.maxPrice ?? '');
+    setMinViews(f.minViews ?? '');
+    setMaxViews(f.maxViews ?? '');
+    setMinLikes(f.minLikes ?? '');
+    setMaxLikes(f.maxLikes ?? '');
+    setDateFrom(f.dateFrom ? new Date(f.dateFrom + 'T00:00:00') : null);
+    setDateTo(f.dateTo ? new Date(f.dateTo + 'T00:00:00') : null);
+    setSort(f.sort ?? 'parsing_date:desc');
+  };
+
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const inputClass = "w-full bg-[#0a0908] border border-[#333] text-white text-sm p-2 rounded outline-none focus:border-blue-500 transition-colors";
   const selectClass = "w-full bg-[#0a0908] border border-[#333] text-gray-300 text-sm p-2 rounded outline-none focus:border-blue-500 transition-colors cursor-pointer";
@@ -444,7 +484,15 @@ export default function ListView() {
     <div className="min-h-screen bg-[#0a0908] text-gray-300 p-4 md:p-6">
       <header className="flex justify-between items-center mb-6 border-b border-[#222] pb-4">
         <h1 className="text-xl font-semibold text-white">Marktplaats Dashboard</h1>
-        <span className="text-sm text-gray-500">Найдено: {totalCount}</span>
+        <div className="flex items-center gap-4">
+          <Link
+            to="/favorites"
+            className="flex items-center gap-1.5 text-sm text-amber-400 hover:text-amber-300 transition-colors"
+          >
+            <Star size={16} /> Избранное
+          </Link>
+          <span className="text-sm text-gray-500">Найдено: {totalCount}</span>
+        </div>
       </header>
 
       <div className="bg-[#141414] p-4 rounded-xl border border-[#222] mb-4 flex flex-wrap gap-3 items-center">
@@ -455,6 +503,9 @@ export default function ListView() {
           </div>
           <button type="submit" className="px-5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition">Найти</button>
         </form>
+        
+        <PresetControls currentFilters={collectFilters()} onLoad={applyPreset} />
+
         <button onClick={resetFilters} className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[#333] bg-[#0a0908] text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition">
           <RotateCcw size={16} /> Сброс
         </button>
@@ -538,32 +589,42 @@ export default function ListView() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {listings.map((item) => (
-            <Link to={`/listing/${item.id}`} key={item.id} className="bg-[#141414] border border-[#222] rounded-xl overflow-hidden hover:border-gray-500 transition-all group flex flex-col">
-              <div className="h-44 bg-[#1a1a1a] relative overflow-hidden flex items-center justify-center">
-                {/* Обработка битых картинок */}
-                {item.image_url && !imageErrors[item.id] ? (
-                  <img 
-                    src={item.image_url} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                    alt="" 
-                    loading="lazy" 
-                    onError={() => setImageErrors(prev => ({ ...prev, [item.id]: true }))}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">Без фото</div>
-                )}
-              </div>
-              <div className="p-3 flex flex-col flex-grow">
-                <h3 className="text-white text-sm line-clamp-2 min-h-[2.5rem] font-medium leading-tight">{item.title}</h3>
-                <div className="flex items-center justify-between text-xs text-gray-500 mt-2 mb-2">
-                  <span className="flex items-center gap-1"><Eye size={14} /> {item.views_count || 0}</span>
-                  <span className="flex items-center gap-1"><Heart size={14} /> {item.favorites_count || 0}</span>
+            <div
+              key={item.id}
+              className="relative bg-[#141414] border border-[#222] rounded-xl overflow-hidden hover:border-gray-500 transition-all group flex flex-col"
+            >
+              {/* Кнопка избранного */}
+              <FavoriteButton
+                isFavorite={favoriteIds.has(String(item.id))}
+                onClick={() => toggleFavorite(item.id, favoriteIds.has(String(item.id)), item.price_cents)}
+              />
+              
+              <Link to={`/listing/${item.id}`} className="flex flex-col flex-grow">
+                <div className="h-44 bg-[#1a1a1a] relative overflow-hidden flex items-center justify-center">
+                  {item.image_url && !imageErrors[item.id] ? (
+                    <img 
+                      src={item.image_url} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                      alt="" 
+                      loading="lazy" 
+                      onError={() => setImageErrors(prev => ({ ...prev, [item.id]: true }))}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-600 text-sm">Без фото</div>
+                  )}
                 </div>
-                <div className="mt-auto">
-                  <strong className="text-lg text-white block">{item.price_cents ? `€ ${(item.price_cents / 100).toFixed(0)}` : 'См. описание'}</strong>
+                <div className="p-3 flex flex-col flex-grow">
+                  <h3 className="text-white text-sm line-clamp-2 min-h-[2.5rem] font-medium leading-tight">{item.title}</h3>
+                  <div className="flex items-center justify-between text-xs text-gray-500 mt-2 mb-2">
+                    <span className="flex items-center gap-1"><Eye size={14} /> {item.views_count || 0}</span>
+                    <span className="flex items-center gap-1"><Heart size={14} /> {item.favorites_count || 0}</span>
+                  </div>
+                  <div className="mt-auto">
+                    <strong className="text-lg text-white block">{item.price_cents ? `€ ${(item.price_cents / 100).toFixed(0)}` : 'См. описание'}</strong>
+                  </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            </div>
           ))}
         </div>
       )}
