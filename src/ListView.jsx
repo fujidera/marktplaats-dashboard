@@ -6,8 +6,6 @@ import CategoryTreeFilter from './CategoryTreeFilter';
 
 const ITEMS_PER_PAGE = 20;
 
-// Дерево категорий (L1 и L2). 
-// Вы можете добавить сюда подкатегории (L2), которые хотите фильтровать.
 const CATEGORY_TREE = [
   { name: 'antiek-en-kunst', children: [{ name: 'schilderijen' }, { name: 'uurwerken' }, { name: 'antiek' }] },
   { name: 'audio-tv-en-foto', children: [{ name: 'televisies' }, { name: 'fotocameras' }, { name: 'audio' }] },
@@ -82,7 +80,6 @@ export default function ListView() {
   const [search, setSearch] = useState('');
   const [exclude, setExclude] = useState('');
   
-  // Используем новый фильтр категорий
   const [excludedCategories, setExcludedCategories] = useState([]);
   
   const [minPrice, setMinPrice] = useState('');
@@ -111,7 +108,6 @@ export default function ListView() {
     if (search) query = query.ilike('title', `%${search}%`);
     if (exclude) query = query.not('title', 'ilike', `%${exclude}%`);
 
-    // --- ЛОГИКА ИСКЛЮЧЕНИЯ КАТЕГОРИЙ ---
     if (excludedCategories.length > 0) {
       const excludedL1 = excludedCategories.filter(c => !c.includes('/'));
       const excludedL2 = excludedCategories.filter(c => c.includes('/')).map(c => c.split('/')[1]);
@@ -123,7 +119,6 @@ export default function ListView() {
         query = query.not('category_l2', 'in', `(${excludedL2.map(c => `"${c}"`).join(',')})`);
       }
     }
-    // -----------------------------------
 
     if (minPrice) query = query.gte('price_cents', parseInt(minPrice) * 100);
     if (maxPrice) query = query.lte('price_cents', parseInt(maxPrice) * 100);
@@ -185,7 +180,6 @@ export default function ListView() {
       <div className="bg-[#141414] p-4 rounded-xl border border-[#222] mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
           
-          {/* Новый фильтр категорий */}
           <CategoryTreeFilter categories={CATEGORY_TREE} excluded={excludedCategories} onChange={setExcludedCategories} />
 
           <FilterDropdown title="Цена (€)" icon={Euro} isActive={!!minPrice || !!maxPrice} onClear={() => { setMinPrice(''); setMaxPrice(''); }}>
