@@ -14,3 +14,7 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* Фикс для нативного календаря и других системных элементов */
+input, select, textarea, button {
+  color-scheme: dark;
+}
