@@ -41,7 +41,7 @@ export default function ListingDetail() {
 
       // 1. info.txt
       const priceStr = item.price_cents ? `${(item.price_cents / 100).toFixed(0)} €` : 'Не указана';
-      let infoText = `Название\n${item.title}\n\nЦена\n${priceStr}\n\nКатегория\n${item.category || '—'}\n\n`;
+      let infoText = `Название\n${item.title}\n\nЦена\n${priceStr}\n\nКатегория\n${item.category_l1 || '—'}\n\n`;
       infoText += `Описание\n${item.description || 'Описание отсутствует.'}\n\nХарактеристики\n`;
       infoText += `Продавец: ${item.seller_name || '—'}\nПросмотры: ${item.views_count || 0}\n`;
       infoText += `В избранном: ${item.favorites_count || 0}\nДата: ${item.publication_date || '—'}\n`;
@@ -84,7 +84,6 @@ export default function ListingDetail() {
     </div>
   );
 
-  // Формируем список фото для отображения
   const displayImages = item.image_urls && item.image_urls.length > 0 
     ? item.image_urls 
     : (item.image_url ? [item.image_url] : []);
@@ -125,7 +124,8 @@ export default function ListingDetail() {
           </div>
 
           <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-6">
-            <span className="flex items-center gap-1"><Tag size={14} /> {item.category || '—'}</span>
+            {/* ИЗМЕНЕНО ЗДЕСЬ */}
+            <span className="flex items-center gap-1"><Tag size={14} /> {item.category_l1 || '—'}</span>
             <span className="flex items-center gap-1">
               <Calendar size={14} /> Опубликовано: {item.publication_date || '—'}
             </span>
